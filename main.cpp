@@ -3,36 +3,33 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <assert.h>
 #include <sstream>
+
+#include "Renderer.h"
+
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
+#include "VertexArray.h"
 
 struct ShaderProgramSource {
     std::string vertexSource;
     std::string fragmentSource;
 };
 
-static ShaderProgramSource parseShader(const std::string& filepath) {
+static std::string parseShader(const std::string& filepath) {
     std::ifstream stream(filepath);
-
-    enum class ShaderType {
-        NONE = -1, VERTEX = 0, FRAGMENT = 1
-    };
-
     std::string line;
-    std::stringstream ss[2];
-    ShaderType type = ShaderType::NONE;
+    std::stringstream src;
     while(getline(stream,line)) {
-        if(line.find("#shader") != std::string::npos) {
-            if(line.find("vertex") != std::string::npos) {
-                type = ShaderType::VERTEX;
-            }else if(line.find("fragment") != std::string::npos){
-                type = ShaderType::FRAGMENT;
-            }
-        }else{
-            ss[(int)type] << line << '\n';
-        }
+         src << line << '\n';
     }
 
-    return {ss[0].str(),ss[1].str()};
+    return src.str();
+}
+
+static ShaderProgramSource parseShaders(const std::string& filepathV,const std::string& filepathF) {
+    return ShaderProgramSource{parseShader(filepathV),parseShader(filepathF)};
 }
 
 static unsigned int CompileShader(unsigned int type,const std::string& source) {
@@ -93,6 +90,8 @@ int main(void)
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
 
+    glfwSwapInterval(1);
+
     if (glewInit() != GLEW_OK) {
         std::cout << "Error!" << std::endl;
     }
@@ -111,33 +110,55 @@ int main(void)
         2, 3, 0
     };
 
-    unsigned int buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), positions, GL_STATIC_DRAW);
+    VertexArray va;
+    va.Bind();
+    VertexBuffer vb(positions,2 * 4 * sizeof(float));
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * sizeof(float), 0);
-    glEnableVertexAttribArray(0);
+    VertexBufferLayout layout;
+    layout.pushFloat(2);
+    va.addBuffer(vb,layout);
 
-    unsigned int ibo;
-    glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(float), indices, GL_STATIC_DRAW);
+    IndexBuffer ib(indices,6);
 
-    ShaderProgramSource source = parseShader("resources/shaders/Basic.shader");
+
+    ShaderProgramSource source = parseShaders("resources/shaders/Basic.vert","resources/shaders/Basic.frag");
 
     unsigned int shader = CreateShader(source.vertexSource,source.fragmentSource);
     glUseProgram(shader);
+
+    int location = glGetUniformLocation(shader,"u_Color");
+
+    glUniform4f(location,0.8f,0.3f,0.8f,1.0f);
+
+    float r = 0.0f;
+    float increment = 0.01f;
 
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
+
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
+
+        glUseProgram(shader);
+        glUniform4f(location,r,0.3f,0.8f,1.0f);
+
+        va.Bind();
+        vb.Bind();
+        ib.Bind();
+
         glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,nullptr);
 
+        r += increment;
+
+        if(r > 1.0f) {
+            increment = -0.01f;
+        }else if(r < 0.0f) {
+            increment = 0.01f;
+        }
+    
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
 
