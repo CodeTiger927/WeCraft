@@ -1,5 +1,8 @@
 #include <vector>
 
+#include "Renderer.h"
+
+
 struct VertexBufferElement {
 	unsigned int count;
 	unsigned int type;
